@@ -11,6 +11,34 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("libstreaming")
 
+add_definitions(-DSOCKLEN_T=socklen_t)
+add_definitions(-DNO_SSTREAM=1)
+add_definitions(-DNEWLOCALE_NOT_USED)
+add_definitions(-DBSD=1)
+
+include_directories(include)
+include_directories(live/UsageEnvironment/include)
+include_directories(live/BasicUsageEnvironment/include)
+include_directories(live/groupsock/include)
+include_directories(live/liveMedia/include)
+
+file(GLOB BasicUsageEnvironmentFiles
+        live/BasicUsageEnvironment/*.cpp)
+add_library(BasicUsageEnvironment
+        ${BasicUsageEnvironmentFiles})
+
+file(GLOB groupsockfiles
+        live/groupsock/*.cpp live/groupsock/*.c)
+add_library(groupsock ${groupsockfiles})
+
+file(GLOB liveMediaFiles
+        live/liveMedia/*.cpp live/liveMedia/*.c)
+add_library(liveMedia ${liveMediaFiles})
+
+file(GLOB UsageEnvironmentFiles
+        live/UsageEnvironment/*.cpp)
+add_library(UsageEnvironment ${UsageEnvironmentFiles})
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -25,7 +53,7 @@ project("libstreaming")
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        # List C/C++ source files with relative paths to this CMakeLists.txt.
+        AndroidFramedSource.cpp
         libstreaming.cpp)
 
 # Specifies libraries CMake should link to your target library. You
@@ -34,4 +62,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         android
-        log)
+        log
+        liveMedia
+        groupsock
+        BasicUsageEnvironment
+        UsageEnvironment)
