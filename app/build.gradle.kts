@@ -47,6 +47,13 @@ dependencies {
     implementation(libs.constraintlayout)
     implementation(libs.navigation.fragment.ktx)
     implementation(libs.navigation.ui.ktx)
+    implementation(libs.androidx.concurrent)
+
+    implementation(libs.androidx.core)
+    implementation(libs.androidx.camera2)
+    implementation(libs.androidx.lifecycle)
+    implementation(libs.androidx.view)
+
     implementation(project(mapOf("path" to ":libstreaming")))
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
