@@ -54,6 +54,7 @@ add_library(UsageEnvironment ${UsageEnvironmentFiles})
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         AndroidFramedSource.cpp
+        AndroidCameraSubsession.cpp
         libstreaming.cpp)
 
 # Specifies libraries CMake should link to your target library. You

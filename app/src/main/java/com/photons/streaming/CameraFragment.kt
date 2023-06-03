@@ -22,7 +22,6 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
-import android.media.MediaCodec
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -40,10 +39,12 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.Navigation
+import com.photons.libstreaming.RtspServer
 import com.photons.streaming.databinding.CameraUiContainerBinding
 import com.photons.streaming.databinding.FragmentCameraBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.nio.ByteBuffer
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -52,9 +53,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-
-/** Helper type alias used for analysis use case callbacks */
-typealias LumaListener = (luma: Double) -> Unit
 
 const val ANIMATION_FAST_MILLIS = 50L
 const val ANIMATION_SLOW_MILLIS = 100L
@@ -76,12 +74,15 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
     private lateinit var broadcastManager: LocalBroadcastManager
 
     private var displayId: Int = -1
-    private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
+    private var lensFacing: Int = CameraSelector.LENS_FACING_FRONT
     private var preview: Preview? = null
     private var encodePreview: Preview? = null
     private var imageCapture: ImageCapture? = null
+    private var cameraSelector: CameraSelector? = null
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
+
+    private val rtsp = RtspServer()
 
     private val displayManager by lazy {
         requireContext().getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
@@ -94,7 +95,7 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
         override fun onSurfaceRequested(request: SurfaceRequest) {
             Log.d(TAG, "onSurfaceRequested")
 
-            VideoEncoder(this@CameraFragment, request.resolution.width, request.resolution.height, 10000, 30).apply {
+            VideoEncoder(this@CameraFragment, request.resolution.width, request.resolution.height, 10000, 25).apply {
                 val surface = getInputSurface()
                 start()
                 Log.d(Companion.TAG, "new surface $surface")
@@ -180,6 +181,27 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
                 setUpCamera()
             }
         }
+
+        encodePreview = Preview.Builder().build().also {
+            it.setSurfaceProvider(CodecSurfaceProvider())
+        }
+        rtsp.start {
+            runBlocking {
+                launch(Dispatchers.Main) {
+                    if (it) {
+                        if (cameraProvider?.isBound(encodePreview!!) == false) {
+                            cameraProvider?.bindToLifecycle(this@CameraFragment, cameraSelector!!, encodePreview!!)
+                        }
+                    } else {
+                        if (cameraProvider?.isBound(encodePreview!!) == true) {
+                            cameraProvider?.unbind(encodePreview!!)
+                        }
+                    }
+                }
+            }
+
+
+        }
     }
 
     /**
@@ -206,8 +228,8 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
 
         // Select lensFacing depending on the available cameras
         lensFacing = when {
-            hasBackCamera() -> CameraSelector.LENS_FACING_BACK
             hasFrontCamera() -> CameraSelector.LENS_FACING_FRONT
+            hasBackCamera() -> CameraSelector.LENS_FACING_BACK
             else -> throw IllegalStateException("Back and front camera are unavailable")
         }
 
@@ -238,7 +260,7 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
                 ?: throw IllegalStateException("Camera initialization failed.")
 
         // CameraSelector
-        val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
 
         // Preview
         preview = Preview.Builder()
@@ -247,10 +269,6 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
                 // Set initial target rotation
                 .setTargetRotation(rotation)
                 .build()
-
-        encodePreview = Preview.Builder().build().also {
-            it.setSurfaceProvider(CodecSurfaceProvider())
-        }
 
         // ImageCapture
         imageCapture = ImageCapture.Builder()
@@ -275,7 +293,7 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
             // A variable number of use-cases can be passed here -
             // camera provides access to CameraControl & CameraInfo
             camera = cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, encodePreview)
+                    this, cameraSelector!!, preview, imageCapture)
 
             // Attach the viewfinder's surface provider to preview use case
             preview?.setSurfaceProvider(fragmentCameraBinding.viewFinder.surfaceProvider)
@@ -510,6 +528,7 @@ class CameraFragment : Fragment(), VideoEncoder.EncoderCallback {
     }
 
     override fun onFrameReady(data: ByteArray, sps: Boolean) {
-        Log.d(TAG, "onFrameReady: ${data.size}, sps $sps")
+//        Log.d(TAG, "onFrameReady: ${data.size}, sps $sps")
+        rtsp.putFrame(data)
     }
 }

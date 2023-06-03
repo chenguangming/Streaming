@@ -12,7 +12,7 @@ import android.view.Surface
 
 
 class VideoEncoder(private val callback: EncoderCallback, width: Int, height: Int, bitrate: Int,
-                   frameRate: Int, codecProfile: Int = -1) : MediaCodec.Callback() {
+                   frameRate: Int) : MediaCodec.Callback() {
     private val TAG = "encoder"
     private val codec: MediaCodec = MediaCodec.createEncoderByType("video/avc")
     private val thread = HandlerThread(TAG)
@@ -32,15 +32,8 @@ class VideoEncoder(private val callback: EncoderCallback, width: Int, height: In
             setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
-
-            if (codecProfile != -1) {
-                setInteger(MediaFormat.KEY_PROFILE, codecProfile)
-                setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT2020)
-                setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_FULL)
-                setInteger(MediaFormat.KEY_COLOR_TRANSFER, getTransferFunction(codecProfile))
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    setFeatureEnabled(CodecCapabilities.FEATURE_HdrEditing, true)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
             }
         }
 
